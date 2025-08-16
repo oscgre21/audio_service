@@ -125,14 +125,21 @@ pip install pydantic-settings
 # Instalar requirements.txt con manejo especial para conflictos
 echo "   - Instalando dependencias del proyecto..."
 
-# Primero instalar transformers y tokenizers compatibles
-pip install transformers==4.41.2 "tokenizers>=0.13,<0.16"
+# Instalar versiones compatibles de todos los paquetes
+echo "   - Resolviendo conflictos de dependencias..."
 
-# Luego instalar whisperx sin dependencias para evitar conflictos
+# Instalar una versión de transformers compatible con tokenizers antiguos
+pip install transformers==4.30.2 tokenizers==0.13.3
+
+# Instalar faster-whisper que es compatible con tokenizers 0.13.3
+pip install faster-whisper==1.0.1
+
+# Instalar whisperx sin dependencias
 pip install whisperx==3.1.5 --no-deps
 
-# Instalar faster-whisper manualmente
-pip install faster-whisper==1.0.1
+# Instalar las dependencias de whisperx manualmente
+pip install pyannote.audio==3.1.1 --no-deps
+pip install onnxruntime>=1.16.0
 
 # Finalmente instalar el resto de requirements
 pip install -r requirements.txt --no-deps 2>/dev/null || {

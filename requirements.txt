@@ -1,8 +1,8 @@
 # Core ML/Audio dependencies
 descript-audio-codec
 torch
-transformers==4.41.2
-tokenizers>=0.13,<0.16
+transformers==4.30.2
+tokenizers==0.13.3
 librosa
 torchvision
 torchaudio
