@@ -22,6 +22,13 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
+# Verificar que las dependencias están instaladas
+if [ ! -f "venv/bin/python" ] && [ ! -f "venv/Scripts/python.exe" ]; then
+    echo -e "${RED}❌ Error: El entorno virtual parece estar corrupto.${NC}"
+    echo "   Por favor ejecuta: ./install.sh"
+    exit 1
+fi
+
 # Verificar que el archivo .env existe
 if [ ! -f ".env" ]; then
     echo -e "${RED}❌ Error: El archivo .env no existe.${NC}"
@@ -33,6 +40,14 @@ fi
 echo -e "${YELLOW}1. Activando entorno virtual...${NC}"
 source venv/bin/activate
 echo -e "${GREEN}✅ Entorno virtual activado${NC}"
+
+# Verificar e instalar dependencias faltantes
+echo -e "${YELLOW}   Verificando dependencias...${NC}"
+python -c "import pydantic_settings" 2>/dev/null || {
+    echo -e "${YELLOW}   ⚠️  Instalando dependencias faltantes...${NC}"
+    pip install pydantic-settings >/dev/null 2>&1
+    echo -e "${GREEN}   ✅ Dependencias actualizadas${NC}"
+}
 
 # Verificar configuración crítica
 echo -e "\n${YELLOW}2. Verificando configuración...${NC}"
