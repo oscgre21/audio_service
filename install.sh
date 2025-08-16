@@ -94,6 +94,7 @@ fi
 
 # Instalar el resto de dependencias
 echo "   - Instalando otras dependencias..."
+echo "   Nota: Esto puede tomar 10-15 minutos debido a las dependencias de ML..."
 pip install -r requirements.txt
 
 echo "✅ Dependencias instaladas"
