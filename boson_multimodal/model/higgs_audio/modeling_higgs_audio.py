@@ -26,7 +26,11 @@ from transformers.models.llama.modeling_llama import (
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.generation import GenerationMixin, GenerationConfig, LogitsProcessorList, StoppingCriteriaList
-from transformers.generation.utils import GenerateNonBeamOutput
+try:
+    from transformers.generation.utils import GenerateNonBeamOutput
+except ImportError:
+    # Para versiones más nuevas de transformers
+    from transformers.generation import GenerateOutput as GenerateNonBeamOutput
 from transformers.utils import logging, ModelOutput
 
 from .common import HiggsAudioPreTrainedModel
