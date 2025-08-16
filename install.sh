@@ -126,7 +126,7 @@ pip install pydantic-settings
 echo "   - Instalando dependencias del proyecto..."
 
 # Primero instalar transformers y tokenizers compatibles
-pip install transformers==4.41.2 tokenizers>=0.13,<0.16
+pip install transformers==4.41.2 "tokenizers>=0.13,<0.16"
 
 # Luego instalar whisperx sin dependencias para evitar conflictos
 pip install whisperx==3.1.5 --no-deps
