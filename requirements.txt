@@ -51,8 +51,7 @@ PyJWT>=2.8.0
 
 # Transcription dependencies (WhisperX with Silero VAD and wav2vec2.0 alignment)
 # WhisperX provides word-level timestamps using forced alignment
-# Note: Using specific commit that works with transformers 4.46.x
-git+https://github.com/m-bain/whisperX.git@v3.1.5
+whisperx==3.1.5
 ffmpeg-python>=0.2.0
 
 # Note: WhisperX will automatically install these dependencies:

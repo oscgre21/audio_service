@@ -85,11 +85,19 @@ echo "   Esto puede tomar varios minutos..."
 # Instalar PyTorch primero (para evitar conflictos)
 echo "   - Instalando PyTorch..."
 if command -v nvidia-smi &> /dev/null; then
-    # Con CUDA
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    # Verificar compatibilidad de GPU
+    GPU_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
+    if [ -n "$GPU_ARCH" ] && [ "$GPU_ARCH" -gt "119" ]; then
+        echo "   ⚠️  GPU detectada (compute capability $GPU_ARCH) puede ser muy nueva"
+        echo "   Instalando PyTorch para CPU por compatibilidad..."
+        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+    else
+        # Con CUDA
+        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+    fi
 else
     # CPU only
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
 fi
 
 # Instalar el resto de dependencias
