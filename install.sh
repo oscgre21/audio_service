@@ -94,23 +94,23 @@ if command -v nvidia-smi &> /dev/null; then
     # RTX 5070 Ti y GPUs muy nuevas (sm_120+)
     if [ -n "$GPU_ARCH" ] && [ "$GPU_ARCH" -ge "120" ]; then
         echo "   ⚠️  GPU muy nueva detectada. Usando CPU por compatibilidad..."
-        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+        pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
         USE_CUDA=false
     # RTX 4090 y GPUs modernas (sm_89)
     elif [[ "$GPU_NAME" == *"RTX 4090"* ]] || [[ "$GPU_NAME" == *"RTX 4080"* ]] || [[ "$GPU_NAME" == *"RTX 4070"* ]] || [ "$GPU_ARCH" -eq "89" ]; then
         echo "   ✅ GPU RTX 40 series detectada. Instalando PyTorch con CUDA 11.8..."
-        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+        pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
         USE_CUDA=true
     # Otras GPUs compatibles
     else
         echo "   ✅ GPU compatible detectada. Instalando PyTorch con CUDA 11.8..."
-        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+        pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
         USE_CUDA=true
     fi
 else
     # CPU only
     echo "   No se detectó GPU NVIDIA. Instalando PyTorch para CPU..."
-    pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+    pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
     USE_CUDA=false
 fi
 
