@@ -18,7 +18,7 @@ audioverse/cache
 .jukit
 /generated_audio
 /higgs_audio_env
-*.wav
+
 # node
 
 node_modules
