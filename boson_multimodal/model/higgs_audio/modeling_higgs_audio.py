@@ -19,42 +19,14 @@ from transformers.models.llama.modeling_llama import (
     LlamaDecoderLayer,
     LlamaRMSNorm,
     LlamaRotaryEmbedding,
+    LLAMA_ATTENTION_CLASSES,
     LlamaMLP,
+    LlamaRMSNorm,
 )
-
-# Handle LLAMA_ATTENTION_CLASSES for different transformers versions
-try:
-    from transformers.models.llama.modeling_llama import LLAMA_ATTENTION_CLASSES
-except ImportError:
-    # For older versions of transformers
-    LLAMA_ATTENTION_CLASSES = {}
-# Patched for compatibility with older transformers versions
-try:
-    from transformers.modeling_attn_mask_utils import AttentionMaskConverter
-except ImportError:
-    # For transformers < 4.28.0
-    AttentionMaskConverter = None
-# Patched for compatibility with older transformers versions
-try:
-    from transformers.cache_utils import Cache, DynamicCache, StaticCache
-except ImportError:
-    try:
-        from transformers.cache_utils import Cache, DynamicCache
-        StaticCache = None
-    except ImportError:
-        Cache = None
-        DynamicCache = None
-        StaticCache = None
+from transformers.modeling_attn_mask_utils import AttentionMaskConverter
+from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.generation import GenerationMixin, GenerationConfig, LogitsProcessorList, StoppingCriteriaList
-# Patched for compatibility with older transformers versions
-try:
-    from transformers.generation.utils import GenerateNonBeamOutput
-except ImportError:
-    # For transformers < 4.40.0
-    try:
-        from transformers.generation.utils import GenerateOutput as GenerateNonBeamOutput
-    except ImportError:
-        from transformers.generation import GenerateOutput as GenerateNonBeamOutput
+from transformers.generation.utils import GenerateNonBeamOutput
 from transformers.utils import logging, ModelOutput
 
 from .common import HiggsAudioPreTrainedModel
@@ -68,57 +40,6 @@ from .cuda_graph_runner import CUDAGraphRunner
 from .audio_head import HiggsAudioDecoderProjector
 
 logger = logging.get_logger(__name__)
-
-# Fallback classes for compatibility
-if AttentionMaskConverter is None:
-    class AttentionMaskConverter:
-        """Simple fallback for AttentionMaskConverter"""
-        @staticmethod
-        def to_causal_4d(attention_mask, input_shape, dtype, device):
-            batch_size, seq_length = input_shape
-            causal_mask = torch.triu(torch.ones((seq_length, seq_length), dtype=torch.bool), diagonal=1)
-            causal_mask = causal_mask.to(device).unsqueeze(0).unsqueeze(0)
-            causal_mask = causal_mask.expand(batch_size, 1, seq_length, seq_length)
-            if attention_mask is not None:
-                causal_mask = causal_mask.masked_fill(attention_mask[:, None, None, :] == 0, True)
-            return causal_mask.to(dtype) * torch.finfo(dtype).min
-
-if Cache is None:
-    class Cache:
-        """Base cache class fallback"""
-        def __init__(self):
-            self.key_cache = []
-            self.value_cache = []
-        
-        def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
-            if len(self.key_cache) <= layer_idx:
-                self.key_cache.append(key_states)
-                self.value_cache.append(value_states)
-            else:
-                self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=2)
-                self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_states], dim=2)
-            return self.key_cache[layer_idx], self.value_cache[layer_idx]
-        
-        def get_seq_length(self, layer_idx=0):
-            if len(self.key_cache) > layer_idx:
-                return self.key_cache[layer_idx].shape[2]
-            return 0
-
-if DynamicCache is None:
-    class DynamicCache(Cache if Cache is not None else object):
-        """DynamicCache fallback"""
-        pass
-
-if StaticCache is None:
-    class StaticCache(Cache if Cache is not None else object):
-        """StaticCache fallback"""
-        def __init__(self, config=None, batch_size=1, max_cache_len=1024, device='cpu', dtype=None):
-            super().__init__()
-            self.max_cache_len = max_cache_len
-            self.batch_size = batch_size
-            
-        def get_max_cache_shape(self):
-            return self.max_cache_len
 
 
 class GenerationMode(Enum):
