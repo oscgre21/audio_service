@@ -264,14 +264,14 @@ echo "11. Aplicando parches de compatibilidad..."
 cat > fix_compatibility.py << 'EOF'
 #!/usr/bin/env python3
 """
-Script para arreglar problemas de compatibilidad con transformers 4.30.2
+Script para arreglar problemas de compatibilidad con transformers 4.36.2
 """
 import os
 import sys
 import re
 
 def patch_modeling_higgs_audio():
-    """Parchea el archivo modeling_higgs_audio.py para compatibilidad con transformers 4.30.2"""
+    """Parchea el archivo modeling_higgs_audio.py para compatibilidad con transformers 4.36.2"""
     file_path = "boson_multimodal/model/higgs_audio/modeling_higgs_audio.py"
     
     if not os.path.exists(file_path):
@@ -298,6 +298,12 @@ def patch_modeling_higgs_audio():
     content = content.replace(
         "from transformers.cache_utils import Cache, DynamicCache, StaticCache",
         "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.cache_utils import Cache, DynamicCache, StaticCache\nexcept ImportError:\n    # For transformers < 4.32.0 - provide fallbacks\n    Cache = None\n    DynamicCache = None\n    StaticCache = None"
+    )
+    
+    # Parche 1c: Reemplazar import de GenerateNonBeamOutput
+    content = content.replace(
+        "from transformers.generation.utils import GenerateNonBeamOutput",
+        "# Patched for compatibility with transformers 4.36.2\ntry:\n    from transformers.generation.utils import GenerateNonBeamOutput\nexcept ImportError:\n    # For transformers < 4.40.0 - use GenerateOutput instead\n    from transformers.generation.utils import GenerateOutput as GenerateNonBeamOutput"
     )
     
     # Parche 2: Arreglar imports de Llama duplicados y LLAMA_ATTENTION_CLASSES
@@ -418,11 +424,11 @@ def check_and_fix_transformers_version():
         version = transformers.__version__
         major, minor, patch = map(int, version.split('.')[:3])
         
-        if major == 4 and minor == 30 and patch == 2:
+        if major == 4 and minor == 36 and patch == 2:
             print(f"   ✅ Transformers {version} es la versión correcta")
             return True
         else:
-            print(f"   ⚠️  Transformers {version} detectado, se recomienda 4.30.2")
+            print(f"   ⚠️  Transformers {version} detectado, se recomienda 4.36.2")
             return False
     except Exception as e:
         print(f"   ❌ Error verificando transformers: {e}")
