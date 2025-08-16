@@ -145,6 +145,10 @@ pip install whisperx==3.1.5 --no-deps
 pip install pyannote.audio==3.1.1 --no-deps
 pip install onnxruntime>=1.16.0
 
+# Instalar botocore para boto3
+echo "   - Instalando dependencias de AWS..."
+pip install botocore==1.35.36
+
 # Finalmente instalar el resto de requirements
 pip install -r requirements.txt --no-deps 2>/dev/null || {
     echo "   - Instalando dependencias restantes individualmente..."
