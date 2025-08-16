@@ -287,6 +287,12 @@ def patch_modeling_higgs_audio():
         "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.modeling_attn_mask_utils import AttentionMaskConverter\nexcept ImportError:\n    # For transformers < 4.28.0\n    AttentionMaskConverter = None"
     )
     
+    # Parche 1b: Reemplazar import de cache_utils
+    content = content.replace(
+        "from transformers.cache_utils import Cache, DynamicCache, StaticCache",
+        "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.cache_utils import Cache, DynamicCache, StaticCache\nexcept ImportError:\n    # For transformers < 4.32.0 - provide fallbacks\n    Cache = None\n    DynamicCache = None\n    StaticCache = None"
+    )
+    
     # Parche 2: Arreglar imports de Llama duplicados y LLAMA_ATTENTION_CLASSES
     old_llama_import = """from transformers.models.llama.modeling_llama import (
     LlamaDecoderLayer,
@@ -313,12 +319,16 @@ except ImportError:
     
     content = content.replace(old_llama_import, new_llama_import)
     
-    # Parche 3: Si AttentionMaskConverter se usa en el código, agregar un fallback
-    if "AttentionMaskConverter" in content and "class AttentionMaskConverterFallback" not in content:
-        # Agregar una implementación fallback después de los imports
-        fallback_code = '''
+    # Parche 3: Si AttentionMaskConverter o Cache se usan en el código, agregar fallbacks
+    needs_fallback = False
+    fallback_code = '''
 
-# Fallback for AttentionMaskConverter if not available
+# Fallbacks for missing classes in transformers 4.30.2
+'''
+    
+    if "AttentionMaskConverter" in content and "class AttentionMaskConverterFallback" not in content:
+        needs_fallback = True
+        fallback_code += '''
 if AttentionMaskConverter is None:
     class AttentionMaskConverterFallback:
         """Simple fallback for AttentionMaskConverter"""
@@ -334,6 +344,53 @@ if AttentionMaskConverter is None:
     
     AttentionMaskConverter = AttentionMaskConverterFallback
 '''
+    
+    if ("Cache" in content or "DynamicCache" in content or "StaticCache" in content) and "class CacheFallback" not in content:
+        needs_fallback = True
+        fallback_code += '''
+# Fallbacks for cache_utils classes
+if Cache is None:
+    class CacheFallback:
+        """Base cache class fallback"""
+        def __init__(self):
+            self.key_cache = []
+            self.value_cache = []
+        
+        def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
+            if len(self.key_cache) <= layer_idx:
+                self.key_cache.append(key_states)
+                self.value_cache.append(value_states)
+            else:
+                self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=2)
+                self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_states], dim=2)
+            return self.key_cache[layer_idx], self.value_cache[layer_idx]
+        
+        def get_seq_length(self, layer_idx=0):
+            if len(self.key_cache) > layer_idx:
+                return self.key_cache[layer_idx].shape[2]
+            return 0
+    
+    Cache = CacheFallback
+
+if DynamicCache is None:
+    class DynamicCacheFallback(CacheFallback if Cache is not None else object):
+        """DynamicCache fallback"""
+        pass
+    
+    DynamicCache = DynamicCacheFallback
+
+if StaticCache is None:
+    class StaticCacheFallback(CacheFallback if Cache is not None else object):
+        """StaticCache fallback"""
+        def __init__(self, config, batch_size, max_cache_len, device, dtype=None):
+            super().__init__()
+            self.max_cache_len = max_cache_len
+            self.batch_size = batch_size
+    
+    StaticCache = StaticCacheFallback
+'''
+    
+    if needs_fallback:
         # Encontrar dónde insertar el código (después de los imports)
         import_end = content.find("from .audio_head import")
         if import_end != -1:
