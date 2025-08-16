@@ -7,7 +7,21 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 from copy import deepcopy
 from transformers import AutoTokenizer, AutoProcessor
-from transformers.cache_utils import StaticCache
+# Patched for compatibility with transformers 4.36.2
+try:
+    from transformers.cache_utils import StaticCache
+except ImportError:
+    # For transformers < 4.32.0 - provide fallback
+    class StaticCache:
+        """StaticCache fallback for older transformers versions"""
+        def __init__(self, config=None, batch_size=1, max_cache_len=1024, device='cpu', dtype=None):
+            self.key_cache = []
+            self.value_cache = []
+            self.max_cache_len = max_cache_len
+            self.batch_size = batch_size
+            
+        def get_max_cache_shape(self):
+            return self.max_cache_len
 from transformers.generation.streamers import BaseStreamer
 from transformers.generation.stopping_criteria import StoppingCriteria
 from dataclasses import asdict
