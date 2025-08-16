@@ -49,6 +49,16 @@ python -c "import pydantic_settings" 2>/dev/null || {
     echo -e "${GREEN}   ✅ Dependencias actualizadas${NC}"
 }
 
+# Verificar versión de transformers
+echo -e "${YELLOW}   Verificando versión de transformers...${NC}"
+TRANSFORMERS_VERSION=$(python -c "import transformers; print(transformers.__version__)" 2>/dev/null || echo "0.0.0")
+if [[ "$TRANSFORMERS_VERSION" > "4.46.99" ]]; then
+    echo -e "${YELLOW}   ⚠️  Versión de transformers incompatible ($TRANSFORMERS_VERSION)${NC}"
+    echo -e "${YELLOW}   Instalando versión compatible...${NC}"
+    pip install "transformers>=4.46.0,<4.47.0" >/dev/null 2>&1
+    echo -e "${GREEN}   ✅ Transformers actualizado a versión compatible${NC}"
+fi
+
 # Verificar configuración crítica
 echo -e "\n${YELLOW}2. Verificando configuración...${NC}"
 
