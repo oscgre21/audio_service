@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 from copy import deepcopy
 from transformers import AutoTokenizer, AutoProcessor
-# Patched for compatibility with transformers 4.36.2
+# Patched for compatibility with older transformers versions
 try:
     from transformers.cache_utils import StaticCache
 except ImportError:

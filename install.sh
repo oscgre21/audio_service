@@ -136,9 +136,9 @@ echo "   - Instalando dependencias del proyecto..."
 # Instalar versiones compatibles de todos los paquetes
 echo "   - Resolviendo conflictos de dependencias..."
 
-# Usar versiones más modernas que tienen wheels precompilados
+# Usar versiones más modernas que soporten rope_scaling avanzado
 echo "   - Instalando transformers y tokenizers..."
-pip install transformers==4.36.2 tokenizers==0.15.0
+pip install transformers==4.44.2 tokenizers==0.19.1
 
 # Instalar faster-whisper compatible
 echo "   - Instalando faster-whisper..."
@@ -264,14 +264,14 @@ echo "11. Aplicando parches de compatibilidad..."
 cat > fix_compatibility.py << 'EOF'
 #!/usr/bin/env python3
 """
-Script para arreglar problemas de compatibilidad con transformers 4.36.2
+Script para arreglar problemas de compatibilidad con transformers
 """
 import os
 import sys
 import re
 
 def patch_modeling_higgs_audio():
-    """Parchea el archivo modeling_higgs_audio.py para compatibilidad con transformers 4.36.2"""
+    """Parchea el archivo modeling_higgs_audio.py para compatibilidad con transformers"""
     file_path = "boson_multimodal/model/higgs_audio/modeling_higgs_audio.py"
     
     if not os.path.exists(file_path):
@@ -291,19 +291,19 @@ def patch_modeling_higgs_audio():
     # Parche 1: Reemplazar import de AttentionMaskConverter
     content = content.replace(
         "from transformers.modeling_attn_mask_utils import AttentionMaskConverter",
-        "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.modeling_attn_mask_utils import AttentionMaskConverter\nexcept ImportError:\n    # For transformers < 4.28.0\n    AttentionMaskConverter = None"
+        "# Patched for compatibility with transformers\ntry:\n    from transformers.modeling_attn_mask_utils import AttentionMaskConverter\nexcept ImportError:\n    # For older transformers versions\n    AttentionMaskConverter = None"
     )
     
     # Parche 1b: Reemplazar import de cache_utils
     content = content.replace(
         "from transformers.cache_utils import Cache, DynamicCache, StaticCache",
-        "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.cache_utils import Cache, DynamicCache, StaticCache\nexcept ImportError:\n    # For transformers < 4.32.0 - provide fallbacks\n    Cache = None\n    DynamicCache = None\n    StaticCache = None"
+        "# Patched for compatibility with transformers\ntry:\n    from transformers.cache_utils import Cache, DynamicCache, StaticCache\nexcept ImportError:\n    # For older transformers versions - provide fallbacks\n    Cache = None\n    DynamicCache = None\n    StaticCache = None"
     )
     
     # Parche 1c: Reemplazar import de GenerateNonBeamOutput
     content = content.replace(
         "from transformers.generation.utils import GenerateNonBeamOutput",
-        "# Patched for compatibility with transformers 4.36.2\ntry:\n    from transformers.generation.utils import GenerateNonBeamOutput\nexcept ImportError:\n    # For transformers < 4.40.0 - use GenerateOutput instead\n    from transformers.generation.utils import GenerateOutput as GenerateNonBeamOutput"
+        "# Patched for compatibility with transformers\ntry:\n    from transformers.generation.utils import GenerateNonBeamOutput\nexcept ImportError:\n    # For older transformers versions - use GenerateOutput instead\n    try:\n        from transformers.generation.utils import GenerateOutput as GenerateNonBeamOutput\n    except ImportError:\n        from transformers.generation import GenerateOutput as GenerateNonBeamOutput"
     )
     
     # Parche 2: Arreglar imports de Llama duplicados y LLAMA_ATTENTION_CLASSES
@@ -424,11 +424,11 @@ def check_and_fix_transformers_version():
         version = transformers.__version__
         major, minor, patch = map(int, version.split('.')[:3])
         
-        if major == 4 and minor == 36 and patch == 2:
-            print(f"   ✅ Transformers {version} es la versión correcta")
+        if major == 4 and minor >= 44:
+            print(f"   ✅ Transformers {version} es compatible")
             return True
         else:
-            print(f"   ⚠️  Transformers {version} detectado, se recomienda 4.36.2")
+            print(f"   ⚠️  Transformers {version} detectado, se recomienda 4.44.2 o superior")
             return False
     except Exception as e:
         print(f"   ❌ Error verificando transformers: {e}")

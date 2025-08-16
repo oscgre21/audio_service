@@ -28,13 +28,13 @@ try:
 except ImportError:
     # For older versions of transformers
     LLAMA_ATTENTION_CLASSES = {}
-# Patched for compatibility with transformers 4.36.2
+# Patched for compatibility with older transformers versions
 try:
     from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 except ImportError:
     # For transformers < 4.28.0
     AttentionMaskConverter = None
-# Patched for compatibility with transformers 4.36.2
+# Patched for compatibility with older transformers versions
 try:
     from transformers.cache_utils import Cache, DynamicCache, StaticCache
 except ImportError:
@@ -46,7 +46,7 @@ except ImportError:
         DynamicCache = None
         StaticCache = None
 from transformers.generation import GenerationMixin, GenerationConfig, LogitsProcessorList, StoppingCriteriaList
-# Patched for compatibility with transformers 4.36.2
+# Patched for compatibility with older transformers versions
 try:
     from transformers.generation.utils import GenerateNonBeamOutput
 except ImportError:
