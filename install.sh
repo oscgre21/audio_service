@@ -309,21 +309,77 @@ else
     echo "- Dispositivo: CPU"
 fi
 echo ""
-echo "Próximos pasos:"
-echo "1. Edita el archivo .env con tus credenciales:"
-echo "   - RABBITMQ_PASSWORD"
-echo "   - UPLOAD_TOKEN (si usas upload)"
-echo "   - AUTH_EMAIL y AUTH_PASSWORD (para autenticación)"
+
+# Preguntar si desea iniciar el servicio
+echo "¿Deseas iniciar el servicio ahora? (s/n)"
+read -p "Respuesta: " -n 1 -r
+echo
+
+if [[ $REPLY =~ ^[Ss]$ ]]; then
+    echo ""
+    echo "===================================="
+    echo "🚀 Iniciando Higgs Audio Service..."
+    echo "===================================="
+    echo ""
+    echo "ℹ️  Presiona Ctrl+C para detener el servicio"
+    echo ""
+    
+    # Verificar credenciales críticas antes de iniciar
+    RABBITMQ_PASSWORD=$(grep RABBITMQ_PASSWORD .env | cut -d '=' -f2)
+    if [ "$RABBITMQ_PASSWORD" == "your_password_here" ] || [ -z "$RABBITMQ_PASSWORD" ]; then
+        echo "⚠️  ADVERTENCIA: RABBITMQ_PASSWORD no está configurado"
+        echo "   El servicio puede fallar al conectarse a RabbitMQ"
+        echo ""
+        echo "   Edita .env y configura:"
+        echo "   - RABBITMQ_PASSWORD"
+        echo "   - UPLOAD_TOKEN (si usas upload)"
+        echo "   - AUTH_EMAIL y AUTH_PASSWORD (si usas autenticación)"
+        echo ""
+        read -p "¿Continuar de todos modos? (s/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+            echo ""
+            echo "Para iniciar el servicio más tarde:"
+            echo "   ./boot.sh"
+            echo ""
+            echo "O manualmente:"
+            echo "   source venv/bin/activate"
+            echo "   python src/main.py"
+            exit 0
+        fi
+    fi
+    
+    # Iniciar el servicio
+    python src/main.py
+    
+    # Manejar salida
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo ""
+        echo "✅ Servicio detenido correctamente"
+    else
+        echo ""
+        echo "❌ El servicio terminó con error (código: $EXIT_CODE)"
+        echo "   Revisa los logs en: audio_processing.log"
+    fi
+else
+    echo ""
+    echo "Para iniciar el servicio más tarde:"
+    echo "   ./boot.sh"
+    echo ""
+    echo "O manualmente:"
+    echo "   source venv/bin/activate"
+    echo "   python src/main.py"
+    echo ""
+    echo "Recuerda editar .env con tus credenciales:"
+    echo "   - RABBITMQ_PASSWORD"
+    echo "   - UPLOAD_TOKEN (si usas upload)"
+    echo "   - AUTH_EMAIL y AUTH_PASSWORD (para autenticación)"
+fi
+
 echo ""
-echo "2. Para ejecutar el servicio:"
-echo "   source venv/bin/activate"
-echo "   python src/main.py"
-echo ""
-echo "   O usa el script de arranque:"
-echo "   ./boot.sh"
-echo ""
-echo "4. Para más información:"
+echo "Para más información:"
 echo "   - README.md: Documentación general"
 echo "   - src/docs/: Documentación técnica detallada"
 echo ""
-echo "¡Disfruta usando Higgs Audio Service! 🎵"
+echo "¡Gracias por usar Higgs Audio Service! 🎵"
