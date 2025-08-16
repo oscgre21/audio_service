@@ -122,6 +122,10 @@ echo "   Nota: Esto puede tomar 10-15 minutos debido a las dependencias de ML...
 echo "   - Instalando pydantic-settings..."
 pip install pydantic-settings
 
+# Instalar numpy compatible con PyTorch 2.1.2
+echo "   - Instalando numpy compatible..."
+pip install "numpy<2.0"
+
 # Instalar requirements.txt con manejo especial para conflictos
 echo "   - Instalando dependencias del proyecto..."
 
