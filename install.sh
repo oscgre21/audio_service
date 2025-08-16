@@ -95,7 +95,22 @@ fi
 # Instalar el resto de dependencias
 echo "   - Instalando otras dependencias..."
 echo "   Nota: Esto puede tomar 10-15 minutos debido a las dependencias de ML..."
+
+# Instalar pydantic-settings primero (requerido pero no siempre listado)
+echo "   - Instalando pydantic-settings..."
+pip install pydantic-settings
+
+# Instalar requirements.txt
 pip install -r requirements.txt
+
+# Verificar versión de transformers
+echo "   - Verificando compatibilidad de transformers..."
+TRANSFORMERS_VERSION=$(python -c "import transformers; print(transformers.__version__)" 2>/dev/null || echo "0.0.0")
+if [[ "$TRANSFORMERS_VERSION" > "4.46.99" ]]; then
+    echo "   ⚠️  Ajustando versión de transformers para compatibilidad..."
+    pip install "transformers>=4.46.0,<4.47.0"
+    echo "   ✅ Transformers ajustado a versión compatible"
+fi
 
 echo "✅ Dependencias instaladas"
 

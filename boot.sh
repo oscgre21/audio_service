@@ -107,11 +107,25 @@ fi
 AUDIO_DEVICE=$(grep AUDIO_DEVICE .env | cut -d '=' -f2 || echo "cuda")
 if [ "$AUDIO_DEVICE" == "cuda" ]; then
     if command -v nvidia-smi &> /dev/null; then
-        echo -e "${GREEN}✅ GPU detectada - usando CUDA${NC}"
+        # Verificar que CUDA realmente funciona
+        python -c "import torch; torch.cuda.is_available()" 2>/dev/null && CUDA_WORKS=true || CUDA_WORKS=false
+        
+        if [ "$CUDA_WORKS" == "true" ]; then
+            echo -e "${GREEN}✅ GPU detectada y funcional - usando CUDA${NC}"
+        else
+            echo -e "${YELLOW}⚠️  GPU detectada pero CUDA no funciona - cambiando a CPU${NC}"
+            echo -e "${YELLOW}   Esto puede deberse a incompatibilidad de drivers o versión de PyTorch${NC}"
+            # Forzar uso de CPU
+            export AUDIO_DEVICE=cpu
+            sed -i.bak 's/AUDIO_DEVICE=cuda/AUDIO_DEVICE=cpu/' .env 2>/dev/null || sed -i '' 's/AUDIO_DEVICE=cuda/AUDIO_DEVICE=cpu/' .env 2>/dev/null
+            echo -e "${GREEN}   ✅ Actualizado .env para usar CPU${NC}"
+        fi
     else
         echo -e "${YELLOW}⚠️  CUDA solicitado pero no disponible - cambiando a CPU${NC}"
-        # Actualizar temporalmente la variable de entorno
+        # Forzar uso de CPU
         export AUDIO_DEVICE=cpu
+        sed -i.bak 's/AUDIO_DEVICE=cuda/AUDIO_DEVICE=cpu/' .env 2>/dev/null || sed -i '' 's/AUDIO_DEVICE=cuda/AUDIO_DEVICE=cpu/' .env 2>/dev/null
+        echo -e "${GREEN}   ✅ Actualizado .env para usar CPU${NC}"
     fi
 else
     echo -e "${BLUE}ℹ️  Usando CPU para procesamiento${NC}"
