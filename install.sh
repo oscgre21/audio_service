@@ -85,19 +85,33 @@ echo "   Esto puede tomar varios minutos..."
 # Instalar PyTorch primero (para evitar conflictos)
 echo "   - Instalando PyTorch..."
 if command -v nvidia-smi &> /dev/null; then
-    # Verificar compatibilidad de GPU
+    # Detectar modelo de GPU
+    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
     GPU_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
-    if [ -n "$GPU_ARCH" ] && [ "$GPU_ARCH" -gt "119" ]; then
-        echo "   ⚠️  GPU detectada (compute capability $GPU_ARCH) puede ser muy nueva"
-        echo "   Instalando PyTorch para CPU por compatibilidad..."
+    
+    echo "   GPU detectada: $GPU_NAME (compute capability: $GPU_ARCH)"
+    
+    # RTX 5070 Ti y GPUs muy nuevas (sm_120+)
+    if [ -n "$GPU_ARCH" ] && [ "$GPU_ARCH" -ge "120" ]; then
+        echo "   ⚠️  GPU muy nueva detectada. Usando CPU por compatibilidad..."
         pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
-    else
-        # Con CUDA
+        USE_CUDA=false
+    # RTX 4090 y GPUs modernas (sm_89)
+    elif [[ "$GPU_NAME" == *"RTX 4090"* ]] || [[ "$GPU_NAME" == *"RTX 4080"* ]] || [[ "$GPU_NAME" == *"RTX 4070"* ]] || [ "$GPU_ARCH" -eq "89" ]; then
+        echo "   ✅ GPU RTX 40 series detectada. Instalando PyTorch con CUDA 11.8..."
         pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+        USE_CUDA=true
+    # Otras GPUs compatibles
+    else
+        echo "   ✅ GPU compatible detectada. Instalando PyTorch con CUDA 11.8..."
+        pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+        USE_CUDA=true
     fi
 else
     # CPU only
+    echo "   No se detectó GPU NVIDIA. Instalando PyTorch para CPU..."
     pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+    USE_CUDA=false
 fi
 
 # Instalar el resto de dependencias
@@ -108,17 +122,32 @@ echo "   Nota: Esto puede tomar 10-15 minutos debido a las dependencias de ML...
 echo "   - Instalando pydantic-settings..."
 pip install pydantic-settings
 
-# Instalar requirements.txt
-pip install -r requirements.txt
+# Instalar requirements.txt con manejo especial para conflictos
+echo "   - Instalando dependencias del proyecto..."
 
-# Verificar versión de transformers
-echo "   - Verificando compatibilidad de transformers..."
-TRANSFORMERS_VERSION=$(python -c "import transformers; print(transformers.__version__)" 2>/dev/null || echo "0.0.0")
-if [[ "$TRANSFORMERS_VERSION" > "4.46.99" ]]; then
-    echo "   ⚠️  Ajustando versión de transformers para compatibilidad..."
-    pip install "transformers>=4.46.0,<4.47.0"
-    echo "   ✅ Transformers ajustado a versión compatible"
-fi
+# Primero instalar transformers y tokenizers compatibles
+pip install transformers==4.41.2 tokenizers>=0.13,<0.16
+
+# Luego instalar whisperx sin dependencias para evitar conflictos
+pip install whisperx==3.1.5 --no-deps
+
+# Instalar faster-whisper manualmente
+pip install faster-whisper==1.0.1
+
+# Finalmente instalar el resto de requirements
+pip install -r requirements.txt --no-deps 2>/dev/null || {
+    echo "   - Instalando dependencias restantes individualmente..."
+    # Instalar las dependencias principales una por una
+    while IFS= read -r line; do
+        # Ignorar comentarios y líneas vacías
+        if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+            # Ignorar las líneas que ya instalamos
+            if [[ ! "$line" =~ transformers ]] && [[ ! "$line" =~ whisperx ]] && [[ ! "$line" =~ tokenizers ]]; then
+                pip install "$line" 2>/dev/null || echo "   ⚠️  No se pudo instalar: $line"
+            fi
+        fi
+    done < requirements.txt
+}
 
 echo "✅ Dependencias instaladas"
 
@@ -140,15 +169,30 @@ if [ -f ".env" ]; then
     if [[ $REPLY =~ ^[Ss]$ ]]; then
         cp .env.example .env
         echo "✅ .env copiado desde .env.example"
-        echo "   ⚠️  IMPORTANTE: Edita .env con tus credenciales"
     else
         echo "✅ Manteniendo .env existente"
     fi
 else
     cp .env.example .env
     echo "✅ .env creado desde .env.example"
-    echo "   ⚠️  IMPORTANTE: Edita .env con tus credenciales"
 fi
+
+# Configurar dispositivo según la detección de GPU
+echo ""
+echo "   Configurando dispositivo de procesamiento..."
+if [ "$USE_CUDA" == "true" ]; then
+    # Configurar para CUDA
+    sed -i.bak 's/AUDIO_DEVICE=.*/AUDIO_DEVICE=cuda/' .env 2>/dev/null || sed -i '' 's/AUDIO_DEVICE=.*/AUDIO_DEVICE=cuda/' .env 2>/dev/null
+    sed -i.bak 's/TRANSCRIPTION_DEVICE=.*/TRANSCRIPTION_DEVICE=cuda/' .env 2>/dev/null || sed -i '' 's/TRANSCRIPTION_DEVICE=.*/TRANSCRIPTION_DEVICE=cuda/' .env 2>/dev/null
+    echo "   ✅ Configurado para usar GPU (CUDA)"
+else
+    # Configurar para CPU
+    sed -i.bak 's/AUDIO_DEVICE=.*/AUDIO_DEVICE=cpu/' .env 2>/dev/null || sed -i '' 's/AUDIO_DEVICE=.*/AUDIO_DEVICE=cpu/' .env 2>/dev/null
+    sed -i.bak 's/TRANSCRIPTION_DEVICE=.*/TRANSCRIPTION_DEVICE=cpu/' .env 2>/dev/null || sed -i '' 's/TRANSCRIPTION_DEVICE=.*/TRANSCRIPTION_DEVICE=cpu/' .env 2>/dev/null
+    echo "   ✅ Configurado para usar CPU"
+fi
+
+echo "   ⚠️  IMPORTANTE: Edita .env con tus credenciales (contraseñas, tokens, etc.)"
 
 # Descargar modelos (opcional)
 echo ""
@@ -186,10 +230,73 @@ else
     echo "⚠️  Configura RABBITMQ_HOST y RABBITMQ_PORT en .env"
 fi
 
+# Arreglar el código de boson_multimodal para compatibilidad
+echo ""
+echo "11. Aplicando parches de compatibilidad..."
+if [ -f "boson_multimodal/model/higgs_audio/modeling_higgs_audio.py" ]; then
+    # Verificar si ya tiene el parche
+    if ! grep -q "Handle different transformers versions" boson_multimodal/model/higgs_audio/modeling_higgs_audio.py; then
+        echo "   - Parcheando modeling_higgs_audio.py para compatibilidad..."
+        # Crear archivo temporal con el parche
+        cat > /tmp/higgs_patch.py << 'EOF'
+import sys
+import re
+
+# Leer el archivo
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+
+# Aplicar el parche
+old_import = """from transformers.models.llama.modeling_llama import (
+    LlamaDecoderLayer,
+    LlamaRMSNorm,
+    LlamaRotaryEmbedding,
+    LLAMA_ATTENTION_CLASSES,
+    LlamaMLP,
+    LlamaRMSNorm,
+)"""
+
+new_import = """from transformers.models.llama.modeling_llama import (
+    LlamaDecoderLayer,
+    LlamaRMSNorm,
+    LlamaRotaryEmbedding,
+    LlamaMLP,
+)
+
+# Handle different transformers versions
+try:
+    from transformers.models.llama.modeling_llama import LLAMA_ATTENTION_CLASSES
+except ImportError:
+    # For older versions of transformers
+    LLAMA_ATTENTION_CLASSES = {}"""
+
+# Reemplazar
+content = content.replace(old_import, new_import)
+
+# Escribir el archivo
+with open(sys.argv[1], 'w') as f:
+    f.write(content)
+EOF
+        python /tmp/higgs_patch.py boson_multimodal/model/higgs_audio/modeling_higgs_audio.py
+        rm /tmp/higgs_patch.py
+        echo "   ✅ Parche aplicado"
+    else
+        echo "   ✅ Parche ya aplicado previamente"
+    fi
+fi
+
 # Resumen final
 echo ""
 echo "===================================="
 echo "✅ Instalación completada!"
+echo ""
+echo "Configuración detectada:"
+if [ "$USE_CUDA" == "true" ]; then
+    echo "- Dispositivo: GPU (CUDA)"
+    echo "- GPU: $GPU_NAME"
+else
+    echo "- Dispositivo: CPU"
+fi
 echo ""
 echo "Próximos pasos:"
 echo "1. Edita el archivo .env con tus credenciales:"
@@ -201,8 +308,8 @@ echo "2. Para ejecutar el servicio:"
 echo "   source venv/bin/activate"
 echo "   python src/main.py"
 echo ""
-echo "3. Para ejecutar con GPU (si está disponible):"
-echo "   Asegúrate de que AUDIO_DEVICE=cuda en .env"
+echo "   O usa el script de arranque:"
+echo "   ./boot.sh"
 echo ""
 echo "4. Para más información:"
 echo "   - README.md: Documentación general"
