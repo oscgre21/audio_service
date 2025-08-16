@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "MultiEdit",
+      "Read",
+      "Write",
+      "Glob",
+      "Grep",
+      "LS",
+      "Task",
+      "WebFetch",
+      "WebSearch",
+      "mcp__ide__getDiagnostics"
+    ]
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "3600000",
+    "BASH_MAX_TIMEOUT_MS": "3600000"
+  }
+}

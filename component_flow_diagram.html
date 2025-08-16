@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagrama de Flujo Principal - Higgs Audio Service</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .diagram-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 95%;
+            overflow-x: auto;
+        }
+        .mermaid {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Diagrama de Flujo Principal con Patrón Strategy</h1>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TB
+    %% External Systems
+    RMQ[RabbitMQ<br/>rabbit.oscgre.com:5672]
+    API[API Server<br/>localhost:3000]
+    
+    %% Entry Points
+    MAIN[main.py<br/>Entry Point]
+    
+    %% Workers & Queue
+    WORKER[MessageConsumerWorker<br/>Message Processing Orchestrator]
+    QUEUE[InMemoryProcessingQueue<br/>FIFO Queue with Priority]
+    
+    %% Strategy Pattern Components
+    ORCHESTRATOR[StrategyOrchestrator<br/>Strategy Coordinator]
+    VAL_STRATEGY[ValidationStrategy<br/>Order: 10]
+    SPEECH_STRATEGY[SpeechProcessingStrategy<br/>Order: 100]
+    TRANS_STRATEGY[TranscriptionProcessingStrategy<br/>Order: 150]
+    POST_STRATEGY[PostProcessingStrategy<br/>Order: 200]
+    WORD_STRATEGY[WordProcessingStrategy<br/>Order: 250]
+    
+    %% Infrastructure Layer
+    RMQC[RabbitMQConsumer<br/>Message Queue Consumer]
+    HIGGS[HiggsAudioGenerator<br/>TTS Engine MPS/CUDA/CPU]
+    CHUNKER[SimpleTextChunker<br/>Text Splitter]
+    STORAGE[LocalFileStorage<br/>File & Metadata]
+    UPLOADER[HttpAudioUploader<br/>HTTP Client]
+    VOICEREF[VoiceReferenceService<br/>Character Voice Manager]
+    WHISPERX[WhisperXTranscriptionService<br/>Word-level Transcription]
+    AUTH[HttpAuthService<br/>Authentication Service]
+    
+    %% LLM Services (NEW)
+    LLM[LLMService<br/>AI Language Model]
+    PROMPT[PromptService<br/>Template Manager]
+    
+    %% Domain Entities
+    MSG[Message Entity<br/>+ retry_count]
+    SPEECH[Speech Entity]
+    AUDIO[Audio Entity]
+    
+    %% Flow
+    RMQ -->|AMQP| RMQC
+    MAIN -->|Initializes| WORKER
+    WORKER -->|Consumes| RMQC
+    RMQC -->|Message| QUEUE
+    QUEUE -->|Dequeue FIFO| WORKER
+    WORKER -->|Process| ORCHESTRATOR
+    
+    %% Strategy Flow
+    ORCHESTRATOR -->|1st| VAL_STRATEGY
+    ORCHESTRATOR -->|2nd| SPEECH_STRATEGY
+    ORCHESTRATOR -->|3rd| TRANS_STRATEGY
+    ORCHESTRATOR -->|4th| POST_STRATEGY
+    ORCHESTRATOR -->|5th| WORD_STRATEGY
+    
+    %% Speech Processing Strategy Flow
+    SPEECH_STRATEGY -->|Extract| SPEECH
+    SPEECH_STRATEGY -->|Get Voice| VOICEREF
+    VOICEREF -->|Voice Path| SPEECH_STRATEGY
+    SPEECH_STRATEGY -->|Check Length| CHUNKER
+    SPEECH_STRATEGY -->|Generate| HIGGS
+    HIGGS -->|WAV File| AUDIO
+    HIGGS -->|Save| STORAGE
+    
+    %% Transcription Processing Strategy Flow
+    TRANS_STRATEGY -->|Read Audio| AUDIO
+    TRANS_STRATEGY -->|Transcribe| WHISPERX
+    WHISPERX -->|Word-level SRT| TRANS_STRATEGY
+    
+    %% Post Processing Strategy Flow
+    POST_STRATEGY -->|Check Transcription| POST_STRATEGY
+    POST_STRATEGY -->|Upload with Word-level SRT| UPLOADER
+    UPLOADER -->|Get Token| AUTH
+    AUTH -->|Access Token| UPLOADER
+    UPLOADER -->|HTTP POST| API
+    
+    %% Word Processing Strategy Flow
+    WORD_STRATEGY -->|Extract Text| SPEECH
+    WORD_STRATEGY -->|Split Words| WORD_STRATEGY
+    WORD_STRATEGY -->|For Each Word| HIGGS
+    WORD_STRATEGY -->|Generate Word Audio| AUDIO
+    WORD_STRATEGY -->|Upload Each Word| UPLOADER
+    UPLOADER -->|audio_type=word| API
+    
+    %% LLM Integration (Available for all strategies)
+    VAL_STRATEGY -.->|Future Use| LLM
+    SPEECH_STRATEGY -.->|Future Use| LLM
+    TRANS_STRATEGY -.->|Future Use| LLM
+    POST_STRATEGY -.->|Future Use| LLM
+    WORD_STRATEGY -.->|Future Use| LLM
+    LLM -->|Get Templates| PROMPT
+    
+    %% Styling
+    classDef external fill:#f9f,stroke:#333,stroke-width:2px
+    classDef infra fill:#bbf,stroke:#333,stroke-width:2px
+    classDef app fill:#bfb,stroke:#333,stroke-width:2px
+    classDef strategy fill:#fbb,stroke:#333,stroke-width:3px
+    classDef domain fill:#ffd,stroke:#333,stroke-width:2px
+    classDef service fill:#fcf,stroke:#333,stroke-width:2px
+    classDef llm fill:#9f9,stroke:#333,stroke-width:3px
+    
+    class RMQ,API external
+    class RMQC,HIGGS,CHUNKER,STORAGE,UPLOADER,WHISPERX,AUTH infra
+    class VOICEREF service
+    class WORKER,QUEUE app
+    class ORCHESTRATOR,VAL_STRATEGY,SPEECH_STRATEGY,TRANS_STRATEGY,POST_STRATEGY,WORD_STRATEGY strategy
+    class MSG,SPEECH,AUDIO domain
+    class LLM,PROMPT llm
+        </div>
+    </div>
+
+    <h2 style="text-align: center; margin-top: 40px;">Descripción del Flujo</h2>
+    <div class="diagram-container">
+        <p><strong>1. Sistemas Externos (Rosa):</strong></p>
+        <ul>
+            <li><strong>RabbitMQ:</strong> Sistema de mensajería que recibe mensajes de procesamiento</li>
+            <li><strong>API Server:</strong> Servidor donde se suben los audios procesados</li>
+        </ul>
+
+        <p><strong>2. Capa de Aplicación (Verde):</strong></p>
+        <ul>
+            <li><strong>main.py:</strong> Punto de entrada que inicializa el sistema</li>
+            <li><strong>MessageConsumerWorker:</strong> Orquestador principal que gestiona el procesamiento</li>
+            <li><strong>InMemoryProcessingQueue:</strong> Cola FIFO con soporte de prioridades</li>
+        </ul>
+
+        <p><strong>3. Patrón Strategy (Rojo - Borde grueso):</strong></p>
+        <ul>
+            <li><strong>StrategyOrchestrator:</strong> Coordina la ejecución secuencial de estrategias</li>
+            <li><strong>ValidationStrategy (Orden 10):</strong> Valida mensajes entrantes</li>
+            <li><strong>SpeechProcessingStrategy (Orden 100):</strong> Genera audio a partir del texto</li>
+            <li><strong>TranscriptionProcessingStrategy (Orden 150):</strong> Transcribe audio palabra por palabra</li>
+            <li><strong>PostProcessingStrategy (Orden 200):</strong> Sube el audio solo cuando la transcripción está completa</li>
+            <li><strong>WordProcessingStrategy (Orden 250):</strong> Procesa cada palabra individualmente, genera audio y lo sube</li>
+        </ul>
+
+        <p><strong>4. Capa de Infraestructura (Azul):</strong></p>
+        <ul>
+            <li><strong>RabbitMQConsumer:</strong> Consume mensajes de la cola</li>
+            <li><strong>HiggsAudioGenerator:</strong> Motor TTS con soporte GPU/CPU</li>
+            <li><strong>WhisperXTranscriptionService:</strong> Servicio de transcripción con alineación palabra por palabra</li>
+            <li><strong>HttpAudioUploader:</strong> Cliente HTTP para subir audios</li>
+            <li><strong>HttpAuthService:</strong> Servicio de autenticación que gestiona tokens JWT</li>
+            <li><strong>LocalFileStorage:</strong> Almacenamiento de archivos y metadata</li>
+        </ul>
+
+        <p><strong>5. Servicios (Morado):</strong></p>
+        <ul>
+            <li><strong>VoiceReferenceService:</strong> Gestiona voces de personajes predefinidas</li>
+        </ul>
+
+        <p><strong>6. Sistema LLM (Verde - Borde grueso) - NUEVO:</strong></p>
+        <ul>
+            <li><strong>LLMService:</strong> Servicio de Language Model con soporte para múltiples proveedores (Ollama, Claude, OpenAI)</li>
+            <li><strong>PromptService:</strong> Gestión de plantillas de prompts categorizadas</li>
+            <li>Disponible para uso futuro por cualquier estrategia (conexiones punteadas)</li>
+        </ul>
+
+        <p><strong>7. Entidades de Dominio (Amarillo):</strong></p>
+        <ul>
+            <li><strong>Message Entity:</strong> Representa el mensaje con contador de reintentos</li>
+            <li><strong>Speech Entity:</strong> Datos del discurso a procesar</li>
+            <li><strong>Audio Entity:</strong> Archivo de audio generado</li>
+        </ul>
+
+        <p><strong>Flujo Principal:</strong></p>
+        <ol>
+            <li>RabbitMQ envía mensajes al RabbitMQConsumer</li>
+            <li>Los mensajes se encolan en InMemoryProcessingQueue</li>
+            <li>MessageConsumerWorker procesa mensajes usando StrategyOrchestrator</li>
+            <li>Las estrategias se ejecutan en orden: Validación → Procesamiento → Transcripción → Post-procesamiento → Procesamiento por palabras</li>
+            <li>Antes de subir, HttpAudioUploader solicita un token válido a HttpAuthService</li>
+            <li>HttpAuthService autentica automáticamente si el token no existe o está por expirar</li>
+            <li>El audio solo se sube cuando la transcripción palabra por palabra está completa</li>
+        </ol>
+    </div>
+
+    <h2 style="text-align: center; margin-top: 40px;">Sistema de Language Models (LLM) - NUEVO</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    subgraph "LLM Integration Flow"
+        STRATEGY[Any Strategy]
+        LLM_SERVICE[LLMService]
+        PROMPT_SERVICE[PromptService]
+        FACTORY[LLMProviderFactory]
+        
+        OLLAMA[OllamaDriver]
+        CLAUDE[ClaudeDriver]
+        OPENAI[OpenAIDriver]
+        
+        STRATEGY -->|Inject| LLM_SERVICE
+        LLM_SERVICE -->|Get Template| PROMPT_SERVICE
+        LLM_SERVICE -->|Select Provider| FACTORY
+        
+        FACTORY -->|provider=ollama| OLLAMA
+        FACTORY -->|provider=claude| CLAUDE
+        FACTORY -->|provider=openai| OPENAI
+        
+        OLLAMA -->|API Call| OLLAMA_API[https://llm.oscgre.com]
+        CLAUDE -->|API Call| CLAUDE_API[Anthropic API]
+        OPENAI -->|API Call| OPENAI_API[OpenAI API]
+    end
+        </div>
+        
+        <p><strong>Características del Sistema LLM:</strong></p>
+        <ul>
+            <li><strong>Multi-proveedor:</strong> Soporta Ollama (por defecto), Claude y OpenAI</li>
+            <li><strong>Sistema de Plantillas:</strong> 13 plantillas predefinidas en 7 categorías</li>
+            <li><strong>Categorías de Prompts:</strong> transcription, translation, summarization, analysis, generation, validation, custom</li>
+            <li><strong>Configuración Dinámica:</strong> Selección de proveedor por variable de entorno</li>
+            <li><strong>Integración No Invasiva:</strong> Disponible para cualquier estrategia sin modificar el flujo actual</li>
+        </ul>
+        
+        <p><strong>Configuración LLM:</strong></p>
+        <ul>
+            <li><strong>LLM_PROVIDER:</strong> ollama (por defecto)</li>
+            <li><strong>LLM_BASE_URL:</strong> https://llm.oscgre.com</li>
+            <li><strong>LLM_MODEL:</strong> llama3.1</li>
+            <li><strong>LLM_TEMPERATURE:</strong> 0.7</li>
+            <li><strong>LLM_MAX_TOKENS:</strong> 2000</li>
+        </ul>
+    </div>
+
+    <h2 style="text-align: center; margin-top: 40px;">Sistema de Autenticación</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    subgraph "Authentication Flow"
+        UPLOAD[HttpAudioUploader]
+        AUTH[HttpAuthService]
+        CACHE{Token<br/>Cached?}
+        VALID{Token<br/>Valid?}
+        LOGIN[Login to API]
+        TOKEN[Access Token]
+        
+        UPLOAD -->|Request Token| AUTH
+        AUTH --> CACHE
+        CACHE -->|Yes| VALID
+        CACHE -->|No| LOGIN
+        VALID -->|Yes| TOKEN
+        VALID -->|No| LOGIN
+        LOGIN -->|Credentials| API[API /auth/login]
+        API -->|Tokens| AUTH
+        AUTH -->|Cache Tokens| TOKEN
+        TOKEN -->|Bearer Token| UPLOAD
+    end
+        </div>
+        
+        <p><strong>Características del Sistema de Autenticación:</strong></p>
+        <ul>
+            <li><strong>Login Automático:</strong> Se autentica automáticamente con las credenciales configuradas</li>
+            <li><strong>Caché de Tokens:</strong> Mantiene tokens en memoria para evitar múltiples logins</li>
+            <li><strong>Renovación Automática:</strong> Renueva tokens 5 minutos antes de que expiren</li>
+            <li><strong>Thread-Safe:</strong> Usa locks para evitar autenticaciones simultáneas</li>
+            <li><strong>Fallback:</strong> Si falla la autenticación, usa el token legacy configurado</li>
+        </ul>
+        
+        <p><strong>Configuración de Autenticación:</strong></p>
+        <ul>
+            <li><strong>AUTH_URL:</strong> http://localhost:3000/auth/login</li>
+            <li><strong>AUTH_EMAIL:</strong> admin@test.com</li>
+            <li><strong>AUTH_PASSWORD:</strong> password123</li>
+            <li><strong>AUTH_TOKEN_REFRESH_MARGIN:</strong> 300 segundos (5 minutos)</li>
+        </ul>
+    </div>
+
+    <h2 style="text-align: center; margin-top: 40px;">Procesamiento Palabra por Palabra</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    subgraph "Word Processing Strategy Detail"
+        WPS_START[WordProcessingStrategy Start]
+        CHECK_AUDIO{Audio Generated?}
+        CHECK_UPLOAD{Uploader Enabled?}
+        EXTRACT[Extract original_text]
+        SPLIT[Split into words]
+        PROCESS[Process Words Concurrently]
+        
+        WPS_START --> CHECK_AUDIO
+        CHECK_AUDIO -->|No| SKIP_WPS[Skip Processing]
+        CHECK_AUDIO -->|Yes| CHECK_UPLOAD
+        CHECK_UPLOAD -->|No| SKIP_WPS
+        CHECK_UPLOAD -->|Yes| EXTRACT
+        EXTRACT --> SPLIT
+        SPLIT --> PROCESS
+        
+        subgraph "Concurrent Word Processing"
+            SEMAPHORE[Semaphore Control<br/>Max 5 concurrent]
+            WORD1[Word 1]
+            WORD2[Word 2]
+            WORDN[Word N]
+            
+            PROCESS --> SEMAPHORE
+            SEMAPHORE --> WORD1
+            SEMAPHORE --> WORD2
+            SEMAPHORE --> WORDN
+            
+            WORD1 -->|Generate| GEN1[Audio Generation]
+            WORD2 -->|Generate| GEN2[Audio Generation]
+            WORDN -->|Generate| GENN[Audio Generation]
+            
+            GEN1 -->|Upload| UP1[Upload word]
+            GEN2 -->|Upload| UP2[Upload word]
+            GENN -->|Upload| UPN[Upload word]
+        end
+        
+        UP1 --> COMPLETE[Processing Complete]
+        UP2 --> COMPLETE
+        UPN --> COMPLETE
+    end
+        </div>
+        
+        <p><strong>Características de WordProcessingStrategy:</strong></p>
+        <ul>
+            <li><strong>Orden de Ejecución:</strong> 250 (después de PostProcessingStrategy)</li>
+            <li><strong>Procesamiento Concurrente:</strong> Máximo 5 palabras simultáneamente (configurable)</li>
+            <li><strong>Timeout por Palabra:</strong> 30 segundos por defecto (configurable)</li>
+            <li><strong>Reutilización de Voz:</strong> Usa la misma voz de referencia del audio principal</li>
+            <li><strong>Upload Individual:</strong> Cada palabra se sube con audio_type="word"</li>
+            <li><strong>Manejo de Errores:</strong> No bloquea el flujo si falla una palabra</li>
+        </ul>
+        
+        <p><strong>Flujo de Procesamiento:</strong></p>
+        <ol>
+            <li>Verifica que el audio principal fue generado exitosamente</li>
+            <li>Extrae el texto original del contexto</li>
+            <li>Divide el texto en palabras individuales</li>
+            <li>Para cada palabra (con control de concurrencia):
+                <ul>
+                    <li>Genera audio usando HiggsAudioGenerator</li>
+                    <li>Guarda el archivo de audio</li>
+                    <li>Sube el audio con metadata (índice y texto de la palabra)</li>
+                    <li>Guarda metadata local del procesamiento</li>
+                </ul>
+            </li>
+            <li>Compila estadísticas del procesamiento</li>
+        </ol>
+        
+        <p><strong>Configuración de WordProcessingStrategy:</strong></p>
+        <ul>
+            <li><strong>WORD_PROCESSING_ENABLED:</strong> true (habilitar/deshabilitar)</li>
+            <li><strong>WORD_PROCESSING_MAX_CONCURRENT:</strong> 5 (palabras procesando simultáneamente)</li>
+            <li><strong>WORD_PROCESSING_TIMEOUT:</strong> 30.0 (timeout en segundos por palabra)</li>
+        </ul>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

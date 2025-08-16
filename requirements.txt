@@ -1,0 +1,72 @@
+# Core ML/Audio dependencies
+descript-audio-codec
+torch
+transformers>=4.45.1,<4.47.0
+librosa
+torchvision
+torchaudio
+vector_quantize_pytorch
+accelerate>=0.26.0
+
+# Data processing
+pandas
+numpy
+json_repair
+pydub
+
+# Configuration and validation
+pydantic
+omegaconf
+python-dotenv>=0.19.0
+dacite
+
+# AWS/Cloud
+boto3==1.35.36
+s3fs
+
+# CLI and utilities
+click
+loguru
+langid
+jieba
+
+# Development tools
+ruff==0.12.2
+
+# Message queue and async
+pika>=1.3.0
+aiofiles>=0.8.0
+
+# Dependency injection
+dependency-injector>=4.41.0
+
+# HTTP clients
+requests>=2.28.0
+aiohttp>=3.8.0
+httpx>=0.24.0
+
+# Authentication
+PyJWT>=2.8.0
+
+# Transcription dependencies (WhisperX with Silero VAD and wav2vec2.0 alignment)
+# WhisperX provides word-level timestamps using forced alignment
+git+https://github.com/m-bain/whisperX.git@main
+ffmpeg-python>=0.2.0
+
+# Note: WhisperX will automatically install these dependencies:
+# - faster-whisper (for efficient Whisper inference)
+# - pyannote.audio (for voice activity detection)
+# - transformers (for wav2vec2.0 alignment models)
+# - torch/torchaudio (already included above)
+# 
+# System requirements:
+# - ffmpeg must be installed on the system:
+#   macOS: brew install ffmpeg
+#   Ubuntu/Debian: sudo apt-get install ffmpeg
+#   Windows: Download from https://ffmpeg.org/download.html
+
+# Testing (optional, move to requirements-dev.txt if preferred)
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
+pytest-cov>=3.0.0
+pytest-mock>=3.7.0
