@@ -252,21 +252,43 @@ fi
 # Arreglar el código de boson_multimodal para compatibilidad
 echo ""
 echo "11. Aplicando parches de compatibilidad..."
-if [ -f "boson_multimodal/model/higgs_audio/modeling_higgs_audio.py" ]; then
-    # Verificar si ya tiene el parche
-    if ! grep -q "Handle different transformers versions" boson_multimodal/model/higgs_audio/modeling_higgs_audio.py; then
-        echo "   - Parcheando modeling_higgs_audio.py para compatibilidad..."
-        # Crear archivo temporal con el parche
-        cat > /tmp/higgs_patch.py << 'EOF'
+
+# Crear un script Python más completo para parchear todos los problemas de compatibilidad
+cat > fix_compatibility.py << 'EOF'
+#!/usr/bin/env python3
+"""
+Script para arreglar problemas de compatibilidad con transformers 4.30.2
+"""
+import os
 import sys
 import re
 
-# Leer el archivo
-with open(sys.argv[1], 'r') as f:
-    content = f.read()
-
-# Aplicar el parche
-old_import = """from transformers.models.llama.modeling_llama import (
+def patch_modeling_higgs_audio():
+    """Parchea el archivo modeling_higgs_audio.py para compatibilidad con transformers 4.30.2"""
+    file_path = "boson_multimodal/model/higgs_audio/modeling_higgs_audio.py"
+    
+    if not os.path.exists(file_path):
+        print(f"   ⚠️  Archivo no encontrado: {file_path}")
+        return False
+    
+    print(f"   - Parcheando {file_path}...")
+    
+    with open(file_path, 'r') as f:
+        content = f.read()
+    
+    # Verificar si ya está parcheado
+    if "# Patched for compatibility" in content:
+        print("   ✅ Ya está parcheado")
+        return True
+    
+    # Parche 1: Reemplazar import de AttentionMaskConverter
+    content = content.replace(
+        "from transformers.modeling_attn_mask_utils import AttentionMaskConverter",
+        "# Patched for compatibility with transformers 4.30.2\ntry:\n    from transformers.modeling_attn_mask_utils import AttentionMaskConverter\nexcept ImportError:\n    # For transformers < 4.28.0\n    AttentionMaskConverter = None"
+    )
+    
+    # Parche 2: Arreglar imports de Llama duplicados y LLAMA_ATTENTION_CLASSES
+    old_llama_import = """from transformers.models.llama.modeling_llama import (
     LlamaDecoderLayer,
     LlamaRMSNorm,
     LlamaRotaryEmbedding,
@@ -274,34 +296,106 @@ old_import = """from transformers.models.llama.modeling_llama import (
     LlamaMLP,
     LlamaRMSNorm,
 )"""
-
-new_import = """from transformers.models.llama.modeling_llama import (
+    
+    new_llama_import = """from transformers.models.llama.modeling_llama import (
     LlamaDecoderLayer,
     LlamaRMSNorm,
     LlamaRotaryEmbedding,
     LlamaMLP,
 )
 
-# Handle different transformers versions
+# Handle LLAMA_ATTENTION_CLASSES for different transformers versions
 try:
     from transformers.models.llama.modeling_llama import LLAMA_ATTENTION_CLASSES
 except ImportError:
     # For older versions of transformers
     LLAMA_ATTENTION_CLASSES = {}"""
+    
+    content = content.replace(old_llama_import, new_llama_import)
+    
+    # Parche 3: Si AttentionMaskConverter se usa en el código, agregar un fallback
+    if "AttentionMaskConverter" in content and "class AttentionMaskConverterFallback" not in content:
+        # Agregar una implementación fallback después de los imports
+        fallback_code = '''
 
-# Reemplazar
-content = content.replace(old_import, new_import)
+# Fallback for AttentionMaskConverter if not available
+if AttentionMaskConverter is None:
+    class AttentionMaskConverterFallback:
+        """Simple fallback for AttentionMaskConverter"""
+        @staticmethod
+        def to_causal_4d(attention_mask, input_shape, dtype, device):
+            batch_size, seq_length = input_shape
+            causal_mask = torch.triu(torch.ones((seq_length, seq_length), dtype=torch.bool), diagonal=1)
+            causal_mask = causal_mask.to(device).unsqueeze(0).unsqueeze(0)
+            causal_mask = causal_mask.expand(batch_size, 1, seq_length, seq_length)
+            if attention_mask is not None:
+                causal_mask = causal_mask.masked_fill(attention_mask[:, None, None, :] == 0, True)
+            return causal_mask.to(dtype) * torch.finfo(dtype).min
+    
+    AttentionMaskConverter = AttentionMaskConverterFallback
+'''
+        # Encontrar dónde insertar el código (después de los imports)
+        import_end = content.find("from .audio_head import")
+        if import_end != -1:
+            import_end = content.find("\n", import_end) + 1
+            content = content[:import_end] + fallback_code + content[import_end:]
+    
+    # Escribir el archivo parcheado
+    with open(file_path, 'w') as f:
+        f.write(content)
+    
+    print("   ✅ Parche aplicado exitosamente")
+    return True
 
-# Escribir el archivo
-with open(sys.argv[1], 'w') as f:
-    f.write(content)
+def check_and_fix_transformers_version():
+    """Verifica la versión de transformers y sugiere actualización si es necesario"""
+    try:
+        import transformers
+        version = transformers.__version__
+        major, minor, patch = map(int, version.split('.')[:3])
+        
+        if major == 4 and minor == 30 and patch == 2:
+            print(f"   ✅ Transformers {version} es la versión correcta")
+            return True
+        else:
+            print(f"   ⚠️  Transformers {version} detectado, se recomienda 4.30.2")
+            return False
+    except Exception as e:
+        print(f"   ❌ Error verificando transformers: {e}")
+        return False
+
+def main():
+    print("Aplicando parches de compatibilidad...")
+    
+    # Aplicar parches
+    success = patch_modeling_higgs_audio()
+    
+    # Verificar versión de transformers
+    check_and_fix_transformers_version()
+    
+    if success:
+        print("✅ Todos los parches aplicados correctamente")
+        return 0
+    else:
+        print("⚠️  Algunos parches no se pudieron aplicar")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
 EOF
-        python /tmp/higgs_patch.py boson_multimodal/model/higgs_audio/modeling_higgs_audio.py
-        rm /tmp/higgs_patch.py
-        echo "   ✅ Parche aplicado"
-    else
-        echo "   ✅ Parche ya aplicado previamente"
-    fi
+
+# Ejecutar el script de parches
+python fix_compatibility.py
+PATCH_STATUS=$?
+
+# Limpiar
+rm -f fix_compatibility.py
+
+if [ $PATCH_STATUS -eq 0 ]; then
+    echo "   ✅ Parches de compatibilidad aplicados"
+else
+    echo "   ⚠️  Advertencia: Algunos parches no se aplicaron correctamente"
+    echo "      El servicio podría tener problemas de compatibilidad"
 fi
 
 # Resumen final
